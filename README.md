@@ -24,7 +24,7 @@ def ecvrf_prove(SK, alpha_string, test_dict=None):
         pi_string - VRF proof, octet string of length ptLen+n+qLen
         If a test_dict is supplied, one will be returned
     """
-    ...
+...
 
 
 # Section 5.2. ECVRF Proof To Hash
@@ -40,7 +40,7 @@ def ecvrf_proof_to_hash(pi_string, test_dict=None):
         ECVRF_proof_to_hash should be run only on pi_string that is known to have been
         produced by ECVRF_prove, or from within ECVRF_verify as specified in Section 5.3.
     """
-    ...
+...
 
 
 # Section 5.3. ECVRF Verifying
@@ -56,6 +56,7 @@ def ecvrf_verify(Y, pi_string, alpha_string, test_dict=None):
         of length hLen; or "INVALID"
         If a test_dict is supplied, one will be returned
     """
+...
 ```
 
 `ecvrf_edwards25519_sha512_elligator2_test.py` applies test cases drawn directly from
