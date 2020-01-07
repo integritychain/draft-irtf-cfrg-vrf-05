@@ -10,18 +10,22 @@
 
 #
 # A self-contained Python 3 reference implementation of draft-irtf-cfrg-vrf-05
-# corresponding to the ECVRF-EDWARDS25519-SHA512-Elligator2 cipher suite configuration,
-# suitable for testing, porting and the generation of test vectors. It is inefficient
-# and not fully secure (e.g. not side-channel resistant, no memory scrubbing etc) and
-# thus should not be used in production. This file retains a significant amount of
-# documentation extracted from the specification.
+# corresponding to the ECVRF-EDWARDS25519-SHA512-Elligator2 cipher suite configuration.
+# This code is suitable for demonstration, porting and the generation of test vectors.
+# However, it is inefficient and not fully secure (e.g. not side-channel resistant, no
+# memory scrubbing etc), so should not be used in production. This file retains a
+# significant amount of documentation extracted from the specification as comments.
+# Section 5.6.1 ECVRF_validate_key is not yet implemented.
+# See https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05.pdf
 #
 # Significant portions of the lower-level ed25519-related code was adapted from that
-# provided in Appendix A of RFC 8032 at https://tools.ietf.org/pdf/rfc8032.pdf
+# provided in Appendix A of RFC 8032 at https://tools.ietf.org/pdf/rfc8032.pdf. The
+# optional test_dict dictionary has no functional impact (strictly for test). Variable
+# naming is largely kept consistent with the documentation source despite PEP 8.
 #
 
 
-import hashlib
+import hashlib  # Python 3 standard library
 
 # Public API
 
@@ -44,17 +48,16 @@ def ecvrf_prove(SK, alpha_string, test_dict=None):
     test_dict = _assert_and_sample(test_dict, 'public_key', public_key)
 
     # 2. H = ECVRF_hash_to_curve(suite_string, Y, alpha_string)
-    suite_string = bytes([0x04])
-    H, test_dict = _ecvrf_hash_to_curve_elligator2_25519(suite_string, public_key, alpha_string, test_dict)
+    H, test_dict = _ecvrf_hash_to_curve_elligator2_25519(SUITE_STRING, public_key, alpha_string, test_dict)
     test_dict = _assert_and_sample(test_dict, 'H', H)
 
     # 3. h_string = point_to_string(H)
     h_string = _decode_point(H)  # ANOMALY: H-point vs H_string?
 
     # 4. Gamma = x*H
-    Gamma = _scalar_multiply(P=h_string, e=secret_scalar)  # P, e  ## TKTK H/H_STRING ARE FOULED
+    Gamma = _scalar_multiply(P=h_string, e=secret_scalar)
 
-    # 5. k = ECVRF_nonce_generation(SK, h_string)  ## TKTK H vs H_STRING
+    # 5. k = ECVRF_nonce_generation(SK, h_string)
     k, test_dict = _ecvrf_nonce_generation_rfc8032(SK, H, test_dict)
 
     # 6. c = ECVRF_hash_points(H, Gamma, k*B, k*H)
@@ -181,7 +184,7 @@ def _ecvrf_hash_to_curve_elligator2_25519(suite_string, Y, alpha_string, test_di
         A = 486662, Montgomery curve constant for curve25519
         cofactor = 8, the cofactor for edwards25519 and curve25519 curves
     """
-    assert suite_string == bytes([0x04])
+    assert suite_string == SUITE_STRING
     # 1. PK_string = point_to_string(Y)
     # 2. one_string = 0x01 = int_to_string(1, 1) (a single octet with value 1)
     one_string = bytes([0x01])
@@ -196,7 +199,7 @@ def _ecvrf_hash_to_curve_elligator2_25519(suite_string, Y, alpha_string, test_di
     oneTwentySeven_string = 0x7f
 
     # 6. truncated_h_string[31] = truncated_h_string[31] & oneTwentySeven_string (this step clears the high-order bit of octet 31)
-    truncated_h_string[31] = int(truncated_h_string[31] & oneTwentySeven_string)  #TKTK NOTE: TRY BYTE
+    truncated_h_string[31] = int(truncated_h_string[31] & oneTwentySeven_string)
 
     # 7. r = string_to_int(truncated_h_string)
     r = int.from_bytes(truncated_h_string, 'little')
@@ -277,7 +280,7 @@ def _ecvrf_hash_points(P1, P2, P3, P4, test_dict=None):
     two_string = bytes([0x02])
 
     # 2. Initialize str = suite_string || two_string
-    string = bytes([0x04]) + two_string
+    string = SUITE_STRING + two_string
 
     # 3. for PJ in [P1, P2, ... PM]:
     #        str = str || point_to_string(PJ)
@@ -337,7 +340,7 @@ def _assert_and_sample(test_dict, key, actual):
     """
     Input:
         test_dict - holds values to assert and records values to sample
-        key - key for assert values, basename (+ _sample') for sampled values.
+        key - key for assert values, basename (+ '_sample') for sampled values.
     Output:
         Return the potentially updated test_dict
     If key exists, assert dict expected value against provided actual value.

@@ -1,13 +1,15 @@
 # Verifiable Random Functions
 
 A self-contained Python 3 reference implementation of [draft-irtf-cfrg-vrf-05](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05.pdf)
-corresponding to the ECVRF-EDWARDS25519-SHA512-Elligator2 cipher suite configuration,
-suitable for  testing, porting and the generation of test vectors. It is inefficient
-and not fully secure (e.g. not side-channel resistant, no memory scrubbing etc) and
-thus should not be used in production. 
+corresponding to the ECVRF-EDWARDS25519-SHA512-Elligator2 cipher suite configuration.
+This code is suitable for demonstration, porting and the generation of test vectors. 
+However, it is inefficient and not fully secure (e.g. not side-channel resistant, no 
+memory scrubbing etc), so should not be used in production. 
 
 Significant portions of the lower-level ed25519-related code was adapted from that 
-provided in Appendix A of [RFC 8032](https://tools.ietf.org/pdf/rfc8032.pdf). 
+provided in Appendix A of [RFC 8032](https://tools.ietf.org/pdf/rfc8032.pdf). The
+optional test_dict dictionary has no functional impact (strictly for test). Variable
+naming is largely kept consistent with the documentation source despite PEP 8.
 
 The `ecvrf_edwards25519_sha512_elligator2.py` file retains a significant amount of
 documentation extracted from the specification, and provides a simple API as follows:
