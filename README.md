@@ -7,7 +7,8 @@ However, it is inefficient and not fully secure (e.g. not side-channel resistant
 memory scrubbing etc), so should not be used in production. 
 
 Significant portions of the lower-level ed25519-related code was adapted from that 
-provided in Appendix A of [RFC 8032](https://tools.ietf.org/pdf/rfc8032.pdf). The
+provided in Appendix A of [RFC 8032](https://tools.ietf.org/pdf/rfc8032.pdf) and
+Bernstein's [ed25519.py sample](https://ed25519.cr.yp.to/python/ed25519.py). The
 optional test_dict dictionary has no functional impact (strictly for test). Variable
 naming is largely kept consistent with the documentation source despite PEP 8.
 
@@ -19,7 +20,7 @@ documentation extracted from the specification, and provides a simple API as fol
 def ecvrf_prove(SK, alpha_string, test_dict=None):
     """
     Input:
-        SK - VRF private key
+        sk - VRF private key
         alpha_string - input alpha, an octet string
         test_dict - optional dict of samples to assert and/or record
     Output:
@@ -49,7 +50,7 @@ def ecvrf_proof_to_hash(pi_string, test_dict=None):
 def ecvrf_verify(Y, pi_string, alpha_string, test_dict=None):
     """
     Input:
-        Y - public key, an EC point
+        y - public key, an EC point
         pi_string - VRF proof, octet string of length ptLen+n+qLen
         alpha_string - VRF input, octet string
         test_dict - optional dict of samples to assert and/or record
