@@ -1,31 +1,12 @@
-# Copyright (C) 2020 Eric Schorn <eschorn@integritychain.com>
-#
-# This program is free software; you can redistribute it and/or modify it under the terms
-# of the GNU General Public License version 3 as published by the Free Software Foundation
-#
-# This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-# without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
+# Copyright (C) 2020 NCC Group plc; Provided under the MIT license
+# Eric Schorn
 
+import hashlib
+import sys
 
-#
-# A self-contained Python 3 reference implementation of draft-irtf-cfrg-vrf-05
-# corresponding to the ECVRF-EDWARDS25519-SHA512-Elligator2 cipher suite configuration.
-# This code is suitable for demonstration, porting and the generation of test vectors.
-# However, it is inefficient and not fully secure (e.g. not side-channel resistant, no
-# memory scrubbing etc), so should not be used in production. This file retains a
-# significant amount of documentation extracted from the specification as comments.
-# Section 5.6.1 ECVRF_validate_key is not yet implemented.
-# See https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05.pdf
-#
-# Significant portions of the lower-level ed25519-related code was adapted from that
-# provided in Appendix A of RFC 8032 at https://tools.ietf.org/pdf/rfc8032.pdf. The
-# optional test_dict dictionary has no functional impact (strictly for test). Variable
-# naming is largely kept consistent with the documentation source despite PEP 8.
-#
-
-
-import hashlib  # Python 3 standard library
+if sys.version_info[0] != 3 or sys.version_info[1] < 7:
+    print("Requires Python v3.7+")
+    sys.exit()
 
 
 # Public API
@@ -41,41 +22,35 @@ def ecvrf_prove(sk, alpha_string):
     """
     # 1. Use sk to derive the VRF secret scalar x and the VRF public key y = x*B
     #    (this derivation depends on the ciphersuite, as per Section 5.5; these values can
-    #    be cached, for example, after key generation, and need not be rederived each time)
-    secret_scalar, public_key = _get_secret_scalar_and_public_key(sk)
-    if 'test_dict' in globals():
-        _assert_and_sample('secret_scalar', secret_scalar)
-        _assert_and_sample('public_key', public_key)
+    #    be cached, for example, after key generation, and need not be re-derived each time)
+    secret_scalar_x, public_key_y = _get_secret_scalar_and_public_key(sk)
 
     # 2. H = ECVRF_hash_to_curve(suite_string, y, alpha_string)
-    h = _ecvrf_hash_to_curve_elligator2_25519(SUITE_STRING, public_key, alpha_string)
-    if 'test_dict' in globals():
-        _assert_and_sample('H', h)
+    h = _ecvrf_hash_to_curve_elligator2_25519(SUITE_STRING, public_key_y, alpha_string)
 
     # 3. h_string = point_to_string(H)
     h_string = _decode_point(h)
 
     # 4. Gamma = x*H
-    gamma = _scalar_multiply(P=h_string, e=secret_scalar)
+    gamma = _scalar_multiply(p=h_string, e=secret_scalar_x)
 
     # 5. k = ECVRF_nonce_generation(sk, h_string)
     k = _ecvrf_nonce_generation_rfc8032(sk, h)
 
     # 6. c = ECVRF_hash_points(H, Gamma, k*B, k*H)
-    k_b = _scalar_multiply(P=BASE, e=k)
-    k_h = _scalar_multiply(P=h_string, e=k)
+    k_b = _scalar_multiply(p=BASE, e=k)
+    k_h = _scalar_multiply(p=h_string, e=k)
     c = _ecvrf_hash_points(h_string, gamma, k_b, k_h)
-    if 'test_dict' in globals():
-        _assert_and_sample('kB', _encode_point(k_b))
-        _assert_and_sample('kH', _encode_point(k_h))
 
     # 7. s = (k + c*x) mod q
-    s = (k + c * secret_scalar) % ORDER
+    s = (k + c * secret_scalar_x) % ORDER
 
     # 8. pi_string = point_to_string(Gamma) || int_to_string(c, n) || int_to_string(s, qLen)
     pi_string = _encode_point(gamma) + int.to_bytes(c, 16, 'little') + int.to_bytes(s, 32, 'little')
+
     if 'test_dict' in globals():
-        _assert_and_sample('pi_string', pi_string)
+        _assert_and_sample(['secret_scalar', 'public_key', 'H', 'gamma', 'kB', 'kH', 'pi_string'],
+                           [secret_scalar_x, public_key_y, h, gamma, _encode_point(k_b), _encode_point(k_h), pi_string])
 
     # 9. Output pi_string
     return pi_string
@@ -106,10 +81,11 @@ def ecvrf_proof_to_hash(pi_string):
     three_string = bytes([0x03])
 
     # 5. beta_string = Hash(suite_string || three_string || point_to_string(cofactor * Gamma))
-    cofactor_gamma = _scalar_multiply(P=gamma, e=8)
+    cofactor_gamma = _scalar_multiply(p=gamma, e=8)
     beta_string = _hash(SUITE_STRING + three_string + _encode_point(cofactor_gamma))
+
     if 'test_dict' in globals():
-        _assert_and_sample('beta_string', beta_string)
+        _assert_and_sample(['beta_string'], [beta_string])
 
     # 6. Output beta_string
     return beta_string
@@ -138,39 +114,38 @@ def ecvrf_verify(y, pi_string, alpha_string):
 
     # 4. H = ECVRF_hash_to_curve(suite_string, y, alpha_string)
     h = _ecvrf_hash_to_curve_elligator2_25519(SUITE_STRING, y, alpha_string)
-    if 'test_dict' in globals():
-        _assert_and_sample('H', h)
 
     # 5. U = s*B - c*y
-    s_b = _scalar_multiply(P=BASE, e=s)
+    s_b = _scalar_multiply(p=BASE, e=s)
     y_point = _decode_point(y)
-    c_y = _scalar_multiply(P=y_point, e=c)
-    nc_y = [c_y[0], PRIME - c_y[1]]
+    c_y = _scalar_multiply(p=y_point, e=c)
+    nc_y = [PRIME - c_y[0], c_y[1]]
+
     u = _edwards_add(s_b, nc_y)
-    n_u = [PRIME - u[0], PRIME - u[1]]  # ANOMALY: Extraneous negation (nV too)
-    if 'test_dict' in globals():
-        _assert_and_sample('U', _encode_point(n_u))
 
     # 6. V = s*H - c*Gamma
-    sH = _scalar_multiply(P=_decode_point(h), e=s)
-    cG = _scalar_multiply(P=gamma, e=c)
-    ncG = [cG[0], PRIME - cG[1]]
-    V = _edwards_add(ncG, sH)
-    nV = [PRIME - V[0], PRIME - V[1]]
-    if 'test_dict' in globals(): _assert_and_sample('V', _encode_point(nV))
+    s_h = _scalar_multiply(p=_decode_point(h), e=s)
+    c_g = _scalar_multiply(p=gamma, e=c)
+    nc_g = [PRIME - c_g[0], c_g[1]]
+    v = _edwards_add(nc_g, s_h)
 
     # 7. c’ = ECVRF_hash_points(H, Gamma, U, V)
-    cp = _ecvrf_hash_points(_decode_point(h), gamma, n_u, nV)
+    cp = _ecvrf_hash_points(_decode_point(h), gamma, u, v)
+
+    if 'test_dict' in globals():
+        _assert_and_sample(['H', 'U', 'V'], [h, _encode_point(u), _encode_point(v)])
 
     # 8. If c and c’ are equal, output ("VALID", ECVRF_proof_to_hash(pi_string)); else output "INVALID"
-    result = "VALID" if c == cp else "INVALID"
-    return result
+    if c != cp:
+        return "INVALID"
+    else:
+        return "VALID", ecvrf_proof_to_hash(pi_string)
 
 
 # Internal functions
 
 # Section 5.4.1.2. ECVRF_hash_to_curve_elligator2_25519
-def _ecvrf_hash_to_curve_elligator2_25519(suite_string, Y, alpha_string):
+def _ecvrf_hash_to_curve_elligator2_25519(suite_string, y, alpha_string):
     """
     Input:
         suite_string - a single octet specifying ECVRF ciphersuite.
@@ -189,31 +164,28 @@ def _ecvrf_hash_to_curve_elligator2_25519(suite_string, Y, alpha_string):
     one_string = bytes([0x01])
 
     # 3. hash_string = Hash(suite_string || one_string || PK_string || alpha_string )
-    hash_string = _hash(suite_string + one_string + Y + alpha_string)
+    hash_string = _hash(suite_string + one_string + y + alpha_string)
 
     # 4. truncated_h_string = hash_string[0]...hash_string[31]
     truncated_h_string = bytearray(hash_string[0:32])
 
     # 5. oneTwentySeven_string = 0x7F = int_to_string(127, 1) (a single octet with value 127)
-    oneTwentySeven_string = 0x7f
+    one_twenty_seven_string = 0x7f
 
     # 6. truncated_h_string[31] = truncated_h_string[31] & oneTwentySeven_string (this step clears the high-order bit of octet 31)
-    truncated_h_string[31] = int(truncated_h_string[31] & oneTwentySeven_string)
+    truncated_h_string[31] = int(truncated_h_string[31] & one_twenty_seven_string)
 
     # 7. r = string_to_int(truncated_h_string)
     r = int.from_bytes(truncated_h_string, 'little')
-    if 'test_dict' in globals(): _assert_and_sample('r', truncated_h_string)
 
     # 8. u = - A / (1 + 2*(r^2) ) mod p (note: the inverse of (1+2*(r^2)) modulo p is guaranteed to exist)
     u = (PRIME - A) * _inverse(1 + 2 * (r ** 2)) % PRIME
 
     # 9. w = u * (u^2 + A*u + 1) mod p (this step evaluates the Montgomery equation for Curve25519)
     w = u * (u ** 2 + A * u + 1) % PRIME
-    if 'test_dict' in globals(): _assert_and_sample('w', int.to_bytes(w, 32, 'little'))
 
     # 10. Let e equal the Legendre symbol of w and p (see note below on how to compute e)
     e = pow(w, (PRIME - 1) // 2, PRIME)
-    if 'test_dict' in globals(): _assert_and_sample('e', int.to_bytes(e, 32, 'little'))
 
     # 11. If e is equal to 1 then final_u = u; else final_u = (-A - u) mod p
     #     (note: final_u is the Montgomery u-coordinate of the output; see  note below on how to compute it)
@@ -228,18 +200,23 @@ def _ecvrf_hash_to_curve_elligator2_25519(suite_string, Y, alpha_string):
     h_string = int.to_bytes(y_coordinate, 32, 'little')
 
     # 14. H_prelim = string_to_point(h_string) (note: string_to_point will not return INVALID by correctness of Elligator2)
-    H_prelim = _decode_point(h_string)
+    h_prelim = _decode_point(h_string)
 
     # 15. Set H = cofactor * H_prelim
-    H = _scalar_multiply(P=H_prelim, e=8)
+    h = _scalar_multiply(p=h_prelim, e=8)
 
     # 16. Output H
-    H_point = _encode_point(H)
-    return H_point
+    h_point = _encode_point(h)
+
+    if 'test_dict' in globals():
+        _assert_and_sample(['r', 'w', 'e'],
+                           [truncated_h_string, int.to_bytes(w, 32, 'little'), int.to_bytes(e, 32, 'little')])
+
+    return h_point
 
 
 # 5.4.2.2. ECVRF Nonce Generation From RFC 8032
-def _ecvrf_nonce_generation_rfc8032(SK, h_string):
+def _ecvrf_nonce_generation_rfc8032(sk, h_string):
     """
     Input:
         sk - an ECVRF secret key
@@ -248,23 +225,25 @@ def _ecvrf_nonce_generation_rfc8032(SK, h_string):
         k - an integer between 0 and q-1
     """
     # 1. hashed_sk_string = Hash (sk)
-    hashed_sk_string = _hash(SK)
+    hashed_sk_string = _hash(sk)
 
     # 2. truncated_hashed_sk_string = hashed_sk_string[32]...hashed_sk_string[63]
     truncated_hashed_sk_string = hashed_sk_string[32:]
 
     # 3. k_string = Hash(truncated_hashed_sk_string || h_string)
     k_string = _hash(truncated_hashed_sk_string + h_string)
-    if 'test_dict' in globals(): _assert_and_sample('k', k_string)  # ANOMALY: k_hash vs k_int
 
     # 4. k = string_to_int(k_string) mod q
     k = int.from_bytes(k_string, 'little') % ORDER
+
+    if 'test_dict' in globals():
+        _assert_and_sample(['k'], [k_string])
 
     return k
 
 
 # Section 5.4.3. ECVRF Hash Points
-def _ecvrf_hash_points(P1, P2, P3, P4):
+def _ecvrf_hash_points(p1, p2, p3, p4):
     """
     Input:
         P1...PM - EC points in G
@@ -279,7 +258,7 @@ def _ecvrf_hash_points(P1, P2, P3, P4):
 
     # 3. for PJ in [P1, P2, ... PM]:
     #        str = str || point_to_string(PJ)
-    string = string + _encode_point(P1) + _encode_point(P2) + _encode_point(P3) + _encode_point(P4)
+    string = string + _encode_point(p1) + _encode_point(p2) + _encode_point(p3) + _encode_point(p4)
 
     # 4. c_string = Hash(str)
     c_string = _hash(string)
@@ -314,10 +293,11 @@ def _ecvrf_decode_proof(pi_string):
     s_string = pi_string[48:]
 
     # 4. Gamma = string_to_point(gamma_string)
-    Gamma = _decode_point(gamma_string)
+    gamma = _decode_point(gamma_string)
 
     # 5. if Gamma = "INVALID" output "INVALID" and stop.
-    if Gamma == "INVALID": return "INVALID"
+    if gamma == "INVALID":
+        return "INVALID"
 
     # 6. c = string_to_int(c_string)
     c = int.from_bytes(c_string, 'little')
@@ -326,10 +306,10 @@ def _ecvrf_decode_proof(pi_string):
     s = int.from_bytes(s_string, 'little')
 
     # 8. Output Gamma, c, and s
-    return (Gamma, c, s)
+    return gamma, c, s
 
 
-def _assert_and_sample(key, actual):
+def _assert_and_sample(keys, actuals):
     """
     Input:
         key - key for assert values, basename (+ '_sample') for sampled values.
@@ -338,39 +318,42 @@ def _assert_and_sample(key, actual):
     If key exists, assert dict expected value against provided actual value.
     Sample actual value and store into test_dict under key + '_sample'.
     """
+    # noinspection PyGlobalUndefined
     global test_dict
-    if key in test_dict and actual:
-        assert actual == test_dict[key]
-    if test_dict: test_dict[key + '_sample'] = actual
-    return test_dict
+    for key, actual in zip(keys, actuals):
+        if key in test_dict and actual:
+            assert actual == test_dict[key]
+        test_dict[key + '_sample'] = actual
 
 
 # Much of the following code has been adapted from ed25519 at https://ed25519.cr.yp.to/software.html retrieved 27 Dec 2019
 
-def _edwards_add(P, Q):
+def _edwards_add(p, q):
     """Edwards curve point addition"""
-    x1 = P[0];
-    y1 = P[1]
-    x2 = Q[0];
-    y2 = Q[1]
+    x1 = p[0]
+    y1 = p[1]
+    x2 = q[0]
+    y2 = q[1]
     x3 = (x1 * y2 + x2 * y1) * _inverse(1 + D * x1 * x2 * y1 * y2)
     y3 = (y1 * y2 + x1 * x2) * _inverse(1 - D * x1 * x2 * y1 * y2)
     return [x3 % PRIME, y3 % PRIME]
 
 
-def _encode_point(P):
+def _encode_point(p):
     """Encode point to string containing LSB OF X followed by 254 bits of y"""
-    return ((P[1] & ((1 << 255) - 1)) + ((P[0] & 1) << 255)).to_bytes(32, 'little')
+    return ((p[1] & ((1 << 255) - 1)) + ((p[0] & 1) << 255)).to_bytes(32, 'little')
 
 
 def _decode_point(s):
     """Decode string containing LSB OF X followed by 254 bits of y into point. Checks on-curve"""
     y = int.from_bytes(s, 'little') & ((1 << 255) - 1)
     x = _x_recover(y)
-    if x & 1 != _get_bit(s, BITS - 1): x = PRIME - x
-    P = [x, y]
-    if not _is_on_curve(P): raise Exception("decoding point that is not on curve")
-    return P
+    if x & 1 != _get_bit(s, BITS - 1):
+        x = PRIME - x
+    p = [x, y]
+    if not _is_on_curve(p):
+        raise Exception("decoding point that is not on curve")
+    return p
 
 
 def _get_bit(h, i):
@@ -379,15 +362,15 @@ def _get_bit(h, i):
     return (h1 >> i) & 0x01
 
 
-def _get_secret_scalar_and_public_key(SK):
+def _get_secret_scalar_and_public_key(sk):
     """Calculate and return the secret_scalar and the corresponding public_key
        secret_scalar is an integer; public_key is an encoded point string
     """
-    h = bytearray(_hash(SK)[0:32])
+    h = bytearray(_hash(sk)[0:32])
     h[31] = int((h[31] & 0x7f) | 0x40)
     h[0] = int(h[0] & 0xf8)
     secret_int = int.from_bytes(h, 'little')
-    public_point = _scalar_multiply(P=BASE, e=secret_int)
+    public_point = _scalar_multiply(p=BASE, e=secret_int)
     public_string = _encode_point(public_point)
     return secret_int, public_string
 
@@ -402,29 +385,33 @@ def _inverse(x):
     return pow(x, PRIME - 2, PRIME)
 
 
-def _is_on_curve(P):
+def _is_on_curve(p):
     """Check to confirm point is on curve; return boolean"""
-    x = P[0];
-    y = P[1]
+    x = p[0]
+    y = p[1]
     result = (-x * x + y * y - 1 - D * x * x * y * y) % PRIME
     return result == 0
 
 
-def _scalar_multiply(P, e):
+def _scalar_multiply(p, e):
     """Scalar multiplied by curve point"""
-    if e == 0: return [0, 1]
-    Q = _scalar_multiply(P, e // 2)
-    Q = _edwards_add(Q, Q)
-    if e & 1: Q = _edwards_add(Q, P)
-    return Q
+    if e == 0:
+        return [0, 1]
+    q = _scalar_multiply(p, e // 2)
+    q = _edwards_add(q, q)
+    if e & 1:
+        q = _edwards_add(q, p)
+    return q
 
 
 def _x_recover(y):
     """Recover x coordinate from y coordinate"""
     xx = (y * y - 1) * _inverse(D * y * y + 1)
     x = pow(xx, (PRIME + 3) // 8, PRIME)
-    if (x * x - xx) % PRIME != 0: x = (x * I) % PRIME
-    if x % 2 != 0: x = PRIME - x
+    if (x * x - xx) % PRIME != 0:
+        x = (x * II) % PRIME
+    if x % 2 != 0:
+        x = PRIME - x
     return x
 
 
@@ -434,7 +421,7 @@ BITS = 256
 PRIME = 2 ** 255 - 19
 ORDER = 2 ** 252 + 27742317777372353535851937790883648493
 TWO_INV = _inverse(2)
-I = pow(2, (PRIME - 1) // 4, PRIME)
+II = pow(2, (PRIME - 1) // 4, PRIME)
 A = 486662
 D = -121665 * _inverse(121666)
 BASEy = 4 * _inverse(5)
@@ -448,6 +435,6 @@ assert pow(2, ORDER - 1, ORDER) == 1
 assert ORDER >= 2 ** (BITS - 4)
 assert ORDER <= 2 ** (BITS - 3)
 assert pow(D, (PRIME - 1) // 2, PRIME) == PRIME - 1
-assert pow(I, 2, PRIME) == PRIME - 1
+assert pow(II, 2, PRIME) == PRIME - 1
 assert _is_on_curve(BASE)
 assert _scalar_multiply(BASE, ORDER) == [0, 1]

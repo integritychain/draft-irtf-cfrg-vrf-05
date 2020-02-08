@@ -40,8 +40,9 @@ assert pi_result == test_dict['pi_string']
 beta_result = ecvrf_edwards25519_sha512_elligator2.ecvrf_proof_to_hash(pi_result)
 assert beta_result == test_dict['beta_string']
 _, Y = ecvrf_edwards25519_sha512_elligator2._get_secret_scalar_and_public_key(SK)
-valid_result = ecvrf_edwards25519_sha512_elligator2.ecvrf_verify(Y, pi_result, alpha_string)
+valid_result, valid_beta = ecvrf_edwards25519_sha512_elligator2.ecvrf_verify(Y, pi_result, alpha_string)
 assert valid_result == "VALID"
+assert valid_beta == beta_result
 print("pass\n")
 
 
@@ -69,8 +70,9 @@ assert pi_result == test_dict['pi_string']
 beta_result = ecvrf_edwards25519_sha512_elligator2.ecvrf_proof_to_hash(pi_result)
 assert beta_result == test_dict['beta_string']
 _, Y = ecvrf_edwards25519_sha512_elligator2._get_secret_scalar_and_public_key(SK)
-valid_result = ecvrf_edwards25519_sha512_elligator2.ecvrf_verify(Y, pi_result, alpha_string)
+valid_result, valid_beta = ecvrf_edwards25519_sha512_elligator2.ecvrf_verify(Y, pi_result, alpha_string)
 assert valid_result == "VALID"
+assert valid_beta == beta_result
 print("pass\n")
 
 
@@ -98,8 +100,9 @@ assert pi_result == test_dict['pi_string']
 beta_result = ecvrf_edwards25519_sha512_elligator2.ecvrf_proof_to_hash(pi_result)
 assert beta_result == test_dict['beta_string']
 _, Y = ecvrf_edwards25519_sha512_elligator2._get_secret_scalar_and_public_key(SK)
-valid_result = ecvrf_edwards25519_sha512_elligator2.ecvrf_verify(Y, pi_result, alpha_string)
+valid_result, valid_beta = ecvrf_edwards25519_sha512_elligator2.ecvrf_verify(Y, pi_result, alpha_string)
 assert valid_result == "VALID"
+assert valid_beta == beta_result
 print("pass\n")
 
 
