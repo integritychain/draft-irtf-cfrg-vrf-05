@@ -49,8 +49,9 @@ def ecvrf_prove(sk, alpha_string):
     pi_string = _encode_point(gamma) + int.to_bytes(c, 16, 'little') + int.to_bytes(s, 32, 'little')
 
     if 'test_dict' in globals():
-        _assert_and_sample(['secret_scalar', 'public_key', 'H', 'gamma', 'kB', 'kH', 'pi_string'],
-                           [secret_scalar_x, public_key_y, h, gamma, _encode_point(k_b), _encode_point(k_h), pi_string])
+        _assert_and_sample(['secret_scalar_x', 'public_key_y', 'h', 'gamma', 'k_b', 'k_h', 'pi_string'],
+                           [secret_scalar_x.to_bytes(32, 'little'), public_key_y, h, _encode_point(gamma),
+                            _encode_point(k_b), _encode_point(k_h), pi_string])
 
     # 9. Output pi_string
     return pi_string
@@ -133,7 +134,7 @@ def ecvrf_verify(y, pi_string, alpha_string):
     cp = _ecvrf_hash_points(_decode_point(h), gamma, u, v)
 
     if 'test_dict' in globals():
-        _assert_and_sample(['H', 'U', 'V'], [h, _encode_point(u), _encode_point(v)])
+        _assert_and_sample(['h', 'u', 'v'], [h, _encode_point(u), _encode_point(v)])
 
     # 8. If c and c’ are equal, output ("VALID", ECVRF_proof_to_hash(pi_string)); else output "INVALID"
     if c != cp:
@@ -322,7 +323,7 @@ def _assert_and_sample(keys, actuals):
     global test_dict
     for key, actual in zip(keys, actuals):
         if key in test_dict and actual:
-            assert actual == test_dict[key]
+            assert actual == test_dict[key], "{}  actual:{} != expected:{}".format(key, actual.hex(), test_dict[key].hex())
         test_dict[key + '_sample'] = actual
 
 
