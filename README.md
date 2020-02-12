@@ -67,7 +67,7 @@ the specification.
 
 ## License
 
-Copyright (C) 2020 Eric Schorn <eschorn@integritychain.com>
+Copyright (C) 2020 Eric Schorn; Provided under the MIT License
 
 This program is free software; you can redistribute it and/or modify it under the terms
 of the GNU General Public License version 3 as published by the Free Software Foundation

@@ -1,5 +1,4 @@
-# Copyright (C) 2020 NCC plc; Provided under the MIT License
-# Eric Schorn
+# Copyright (C) 2020 Eric Schorn; Provided under the MIT License
 
 import ecvrf_edwards25519_sha512_elligator2
 

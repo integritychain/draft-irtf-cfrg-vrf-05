@@ -1,5 +1,4 @@
-# Copyright (C) 2020 NCC Group plc; Provided under the MIT license
-# Eric Schorn
+# Copyright (C) 2020 Eric Schorn; Provided under the MIT license
 
 import hashlib
 import sys
